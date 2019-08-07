@@ -3,6 +3,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-
+    <ru.s4nchez.movingcar.CarView
+        android:id="@+id/car_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </FrameLayout>
