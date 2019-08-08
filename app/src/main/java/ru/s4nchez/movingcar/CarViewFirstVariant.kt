@@ -14,7 +14,7 @@ import android.view.animation.LinearInterpolator
 class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     companion object {
-        private const val DESTINATION_MARKER_RADIUS = 50.0f
+        private const val DESTINATION_MARKER_RADIUS = 25.0f
         private const val CAR_MARKER_WIDTH = 100.0f
         private const val CAR_MARKER_HEIGHT = 175.0f
         private const val DESTINATION_POINT_START_X = 500f
@@ -26,14 +26,14 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
 
     private var destinationPoint = PointF(DESTINATION_POINT_START_X, DESTINATION_POINT_START_Y)
 
-    private val destinationPointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.RED }
+    private val destinationPointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.DKGRAY }
     private val carPointPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val carMatrix = Matrix()
     private val pathMeasure = PathMeasure()
 
     private var carBitmap: Bitmap = Bitmap.createScaledBitmap(
-            BitmapFactory.decodeResource(context.resources, R.drawable.car),
+            BitmapFactory.decodeResource(context.resources, R.drawable.tank),
             CAR_MARKER_WIDTH.toInt(), CAR_MARKER_HEIGHT.toInt(), false)
 
     private val car = Car(
