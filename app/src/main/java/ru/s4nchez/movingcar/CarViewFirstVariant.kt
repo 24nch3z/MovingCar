@@ -22,19 +22,25 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         private const val CAR_POINT_START_X = 500f
         private const val CAR_POINT_START_Y = -1000f
         private const val CAR_POINT_START_ANGLE = 0f
+        private const val CLICK_ANIMATION_CIRCLE_SIZE = 250f
+        private const val CLICK_ANIMATION_DURATION = 1000L
     }
 
     private var destinationPoint = PointF(DESTINATION_POINT_START_X, DESTINATION_POINT_START_Y)
 
     private val destinationPointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.DKGRAY }
     private val carPointPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val clickAnimationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
 
     private val carMatrix = Matrix()
     private val pathMeasure = PathMeasure()
+    private var clickAnimationCircleSize = 0f
+    private var clickAnimationAlpha = 0f
 
     private var carBitmap: Bitmap = Bitmap.createScaledBitmap(
             BitmapFactory.decodeResource(context.resources, R.drawable.tank),
-            CAR_MARKER_WIDTH.toInt(), CAR_MARKER_HEIGHT.toInt(), false)
+            CAR_MARKER_WIDTH.toInt(), CAR_MARKER_HEIGHT.toInt(), false
+    )
 
     private val car = Car(
             x = CAR_POINT_START_X,
@@ -76,6 +82,15 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         })
     }
 
+    private val clickAnimator = ValueAnimator.ofFloat(0.0f, CLICK_ANIMATION_CIRCLE_SIZE).apply {
+        duration = CLICK_ANIMATION_DURATION
+        addUpdateListener {
+            clickAnimationCircleSize = it.animatedValue as Float
+            clickAnimationAlpha = 1.0f - it.animatedValue as Float / CLICK_ANIMATION_CIRCLE_SIZE
+            invalidate()
+        }
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val measureWidth = resolveSize(calculateDesiredWidth(), widthMeasureSpec)
         val measureHeight = resolveSize(calculateDesiredHeight(), heightMeasureSpec)
@@ -91,8 +106,14 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
     }
 
     override fun onDraw(canvas: Canvas) {
+        drawClickAnimation(canvas)
         drawDestinationPoint(canvas)
         drawCar(canvas)
+    }
+
+    private fun drawClickAnimation(canvas: Canvas) {
+        clickAnimationPaint.alpha = (clickAnimationAlpha * 255).toInt()
+        canvas.drawCircle(destinationPoint.x, destinationPoint.y, clickAnimationCircleSize, clickAnimationPaint)
     }
 
     private fun drawDestinationPoint(canvas: Canvas) {
@@ -101,7 +122,8 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
                     destinationPoint.x,
                     destinationPoint.y,
                     DESTINATION_MARKER_RADIUS,
-                    destinationPointPaint)
+                    destinationPointPaint
+            )
         }
     }
 
@@ -139,6 +161,8 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         if (car.isMoving || car.isRotating) {
             return
         }
+
+        clickAnimator.start()
 
         destinationPoint.x = x
         destinationPoint.y = y
@@ -204,7 +228,8 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
             var x: Float,
             var y: Float,
             var currentAngle: Float,
-            var neededAngle: Float) {
+            var neededAngle: Float
+    ) {
 
         var isRotating: Boolean = false
             private set
