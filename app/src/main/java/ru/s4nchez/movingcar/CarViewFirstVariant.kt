@@ -30,6 +30,8 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
     private val carPointPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val carMatrix = Matrix()
+    private val pathMeasure = PathMeasure()
+
     private var carBitmap: Bitmap = Bitmap.createScaledBitmap(
             BitmapFactory.decodeResource(context.resources, R.drawable.car),
             CAR_MARKER_WIDTH.toInt(), CAR_MARKER_HEIGHT.toInt(), false)
@@ -40,6 +42,39 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
             currentAngle = CAR_POINT_START_ANGLE,
             neededAngle = CAR_POINT_START_ANGLE
     )
+
+    private val rotateAnimator = ValueAnimator().apply {
+        interpolator = LinearInterpolator()
+        addUpdateListener {
+            car.currentAngle = (it.animatedValue as Float)
+            invalidate()
+        }
+        addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator?) {
+                startMoving()
+                super.onAnimationEnd(animation)
+            }
+        })
+    }
+
+    private val moveAnimator = ValueAnimator().apply {
+        interpolator = AccelerateInterpolator()
+        addUpdateListener {
+            val value = it.animatedValue as Float
+            val pos = FloatArray(2)
+            val tan = FloatArray(2)
+            pathMeasure.getPosTan(value, pos, tan)
+            car.x = pos[0]
+            car.y = pos[1]
+            invalidate()
+        }
+        addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator?) {
+                car.stopMoving()
+                super.onAnimationEnd(animation)
+            }
+        })
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val measureWidth = resolveSize(calculateDesiredWidth(), widthMeasureSpec)
@@ -122,23 +157,16 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
             else -> -triangleAngle
         }.toFloat()
 
-        car.neededAngle = calculateNeededAngle(destinationAngle)
-
+        val neededAngle = calculateNeededAngle(destinationAngle)
+        car.neededAngle = neededAngle
         car.startRotate()
-        ValueAnimator.ofFloat(car.currentAngle, car.neededAngle).apply {
-            duration = 1000
-            interpolator = LinearInterpolator()
-            addUpdateListener {
-                car.currentAngle = (it.animatedValue as Float)
-                invalidate()
-            }
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator?) {
-                    startMoving()
-                    super.onAnimationEnd(animation)
-                }
-            })
-        }.start()
+
+        val diffAngle = Math.abs(car.currentAngle - neededAngle)
+        val duration = (200 + 4.5 * diffAngle).toLong()
+
+        rotateAnimator.setFloatValues(car.currentAngle, car.neededAngle)
+        rotateAnimator.duration = duration
+        rotateAnimator.start()
 
         invalidate()
     }
@@ -162,29 +190,14 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         val path = Path()
         path.moveTo(car.x, car.y)
         path.lineTo(destinationPoint.x, destinationPoint.y)
-        val pathMeasure = PathMeasure()
         pathMeasure.setPath(path, false)
 
         val pathLength = pathMeasure.length
-        ValueAnimator.ofFloat(0f, pathLength).apply {
-            duration = 2000
-            interpolator = AccelerateInterpolator()
-            addUpdateListener {
-                val value = it.animatedValue as Float
-                val pos = FloatArray(2)
-                val tan = FloatArray(2)
-                pathMeasure.getPosTan(value, pos, tan)
-                car.x = pos[0]
-                car.y = pos[1]
-                invalidate()
-            }
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator?) {
-                    car.stopMoving()
-                    super.onAnimationEnd(animation)
-                }
-            })
-        }.start()
+        val duration = 200L + pathLength.toLong()
+
+        moveAnimator.setFloatValues(0f, pathLength)
+        moveAnimator.duration = duration
+        moveAnimator.start()
     }
 
     class Car(
