@@ -8,6 +8,7 @@ import android.graphics.*
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.AccelerateInterpolator
 import android.view.animation.LinearInterpolator
 
 class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context, attrs) {
@@ -16,18 +17,16 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         private const val DESTINATION_MARKER_RADIUS = 50.0f
         private const val CAR_MARKER_WIDTH = 100.0f
         private const val CAR_MARKER_HEIGHT = 175.0f
-        private const val DESTINATION_MARKER_START_X = 500f
-        private const val DESTINATION_MARKER_START_Y = 500f
-        private const val CAR_MARKER_START_X = 500f
-        private const val CAR_MARKER_START_Y = 500f
-        private const val CAR_MARKER_START_ANGLE = 0f
+        private const val DESTINATION_POINT_START_X = 500f
+        private const val DESTINATION_POINT_START_Y = -200f
+        private const val CAR_POINT_START_X = 500f
+        private const val CAR_POINT_START_Y = -1000f
+        private const val CAR_POINT_START_ANGLE = 0f
     }
 
-    private var destinationPoint = PointF(200.0f, 500.0f)
-    private var extraPoint = PointF(0.0f, 0.0f)
+    private var destinationPoint = PointF(DESTINATION_POINT_START_X, DESTINATION_POINT_START_Y)
 
-    private val destinationPointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLUE }
-    private val extraPointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.GREEN }
+    private val destinationPointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.RED }
     private val carPointPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val carMatrix = Matrix()
@@ -36,10 +35,10 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
             CAR_MARKER_WIDTH.toInt(), CAR_MARKER_HEIGHT.toInt(), false)
 
     private val car = Car(
-            x = 500f,
-            y = 500f,
-            currentAngle = 0.0f,
-            neededAngle = 0.0f
+            x = CAR_POINT_START_X,
+            y = CAR_POINT_START_Y,
+            currentAngle = CAR_POINT_START_ANGLE,
+            neededAngle = CAR_POINT_START_ANGLE
     )
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -58,24 +57,17 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
 
     override fun onDraw(canvas: Canvas) {
         drawDestinationPoint(canvas)
-        drawExtraPoint(canvas)
         drawCar(canvas)
     }
 
-    private fun drawExtraPoint(canvas: Canvas) {
-        canvas.drawCircle(
-                extraPoint.x,
-                extraPoint.y,
-                DESTINATION_MARKER_RADIUS / 3,
-                extraPointPaint)
-    }
-
     private fun drawDestinationPoint(canvas: Canvas) {
-        canvas.drawCircle(
-                destinationPoint.x,
-                destinationPoint.y,
-                DESTINATION_MARKER_RADIUS,
-                destinationPointPaint)
+        if (car.isRotating || car.isMoving) {
+            canvas.drawCircle(
+                    destinationPoint.x,
+                    destinationPoint.y,
+                    DESTINATION_MARKER_RADIUS,
+                    destinationPointPaint)
+        }
     }
 
     private fun drawCar(canvas: Canvas) {
@@ -109,25 +101,30 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
     }
 
     private fun handleClick(x: Float, y: Float) {
+        if (car.isMoving || car.isRotating) {
+            return
+        }
+
         destinationPoint.x = x
         destinationPoint.y = y
 
-        extraPoint.x = car.x
-        extraPoint.y = y
+        val extraPoint = PointF(car.x, y)
 
         val cathet1Length = Math.abs(car.y - extraPoint.y).toDouble()
         val cathet2Length = Math.abs(destinationPoint.x - extraPoint.x).toDouble()
         val atan = Math.atan(cathet2Length / cathet1Length)
         val triangleAngle = Math.toDegrees(atan)
 
-        car.neededAngle = when {
+        val destinationAngle = when {
             destinationPoint.y >= car.y && destinationPoint.x >= car.x -> 180.0 - triangleAngle
             destinationPoint.y >= car.y && destinationPoint.x < car.x -> 180.0 + triangleAngle
             destinationPoint.y < car.y && destinationPoint.x >= car.x -> triangleAngle
             else -> -triangleAngle
         }.toFloat()
 
-        car.isRotating = true
+        car.neededAngle = calculateNeededAngle(destinationAngle)
+
+        car.startRotate()
         ValueAnimator.ofFloat(car.currentAngle, car.neededAngle).apply {
             duration = 1000
             interpolator = LinearInterpolator()
@@ -146,9 +143,21 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         invalidate()
     }
 
+    private fun calculateNeededAngle(destinationAngle: Float): Float {
+        val diff = Math.abs(car.currentAngle - destinationAngle)
+        return if (diff > 180f) {
+            if (destinationAngle > car.currentAngle) {
+                car.currentAngle - (360 - diff)
+            } else {
+                car.currentAngle + (360 - diff)
+            }
+        } else {
+            destinationAngle
+        }
+    }
+
     private fun startMoving() {
-        car.isRotating = false
-        car.isMoving = true
+        car.startMoving()
 
         val path = Path()
         path.moveTo(car.x, car.y)
@@ -159,7 +168,7 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         val pathLength = pathMeasure.length
         ValueAnimator.ofFloat(0f, pathLength).apply {
             duration = 2000
-            interpolator = LinearInterpolator()
+            interpolator = AccelerateInterpolator()
             addUpdateListener {
                 val value = it.animatedValue as Float
                 val pos = FloatArray(2)
@@ -171,8 +180,7 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator?) {
-                    car.isRotating = false
-                    car.isMoving = false
+                    car.stopMoving()
                     super.onAnimationEnd(animation)
                 }
             })
@@ -183,10 +191,14 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
             var x: Float,
             var y: Float,
             var currentAngle: Float,
-            var neededAngle: Float,
-            var isRotating: Boolean = false,
-            var isMoving: Boolean = false
-    )/* {
+            var neededAngle: Float) {
+
+        var isRotating: Boolean = false
+            private set
+
+        var isMoving: Boolean = false
+            private set
+
         fun startRotate() {
             isRotating = true
             isMoving = false
@@ -195,11 +207,22 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         fun startMoving() {
             isRotating = false
             isMoving = true
+            calculateRightAngle()
         }
 
         fun stopMoving() {
             isRotating = false
             isMoving = false
         }
-    }*/
+
+        private fun calculateRightAngle() {
+            if (currentAngle < -90) {
+                val tmp = -90 - currentAngle
+                currentAngle = 270 - tmp
+            } else if (currentAngle > 270) {
+                val tmp = currentAngle - 270
+                currentAngle = -90 + tmp
+            }
+        }
+    }
 }
