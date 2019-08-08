@@ -1,10 +1,11 @@
 package ru.s4nchez.movingcar
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.LinearInterpolator
@@ -127,22 +128,55 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         }.toFloat()
 
         car.isRotating = true
-        val animator = ValueAnimator.ofFloat(car.currentAngle, car.neededAngle)
-        animator.duration = 1000
-        animator.interpolator = LinearInterpolator()
-        animator.addUpdateListener {
-            car.currentAngle = (it.animatedValue as Float)
-            invalidate()
-        }
-        animator.start()
-
-        Log.d("sssss", car.neededAngle.toString())
-
-//        Log.d("sssss", "cathet 1: $cathet1Length")
-//        Log.d("sssss", "cathet 2: $cathet2Length")
-//        Log.d("sssss", "hz: ${Math.toDegrees(triangleAngle)}")
+        ValueAnimator.ofFloat(car.currentAngle, car.neededAngle).apply {
+            duration = 1000
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                car.currentAngle = (it.animatedValue as Float)
+                invalidate()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator?) {
+                    startMoving()
+                    super.onAnimationEnd(animation)
+                }
+            })
+        }.start()
 
         invalidate()
+    }
+
+    private fun startMoving() {
+        car.isRotating = false
+        car.isMoving = true
+
+        val path = Path()
+        path.moveTo(car.x, car.y)
+        path.lineTo(destinationPoint.x, destinationPoint.y)
+        val pathMeasure = PathMeasure()
+        pathMeasure.setPath(path, false)
+
+        val pathLength = pathMeasure.length
+        ValueAnimator.ofFloat(0f, pathLength).apply {
+            duration = 2000
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                val value = it.animatedValue as Float
+                val pos = FloatArray(2)
+                val tan = FloatArray(2)
+                pathMeasure.getPosTan(value, pos, tan)
+                car.x = pos[0]
+                car.y = pos[1]
+                invalidate()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator?) {
+                    car.isRotating = false
+                    car.isMoving = false
+                    super.onAnimationEnd(animation)
+                }
+            })
+        }.start()
     }
 
     class Car(
@@ -152,5 +186,20 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
             var neededAngle: Float,
             var isRotating: Boolean = false,
             var isMoving: Boolean = false
-    )
+    )/* {
+        fun startRotate() {
+            isRotating = true
+            isMoving = false
+        }
+
+        fun startMoving() {
+            isRotating = false
+            isMoving = true
+        }
+
+        fun stopMoving() {
+            isRotating = false
+            isMoving = false
+        }
+    }*/
 }
