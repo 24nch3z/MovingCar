@@ -161,6 +161,11 @@ class CarViewFirstVariant(context: Context, attrs: AttributeSet?) : View(context
         if (car.isMoving || car.isRotating) {
             return
         }
+        // При попытке делать анимации в ту же точку, где авто, происходят ошибки при подсчётах
+        // и иконка танка пропадает
+        if (x.equals(car.x) && y.equals(car.y)) {
+            return
+        }
 
         clickAnimator.start()
 
